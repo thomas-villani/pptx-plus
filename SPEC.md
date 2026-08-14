@@ -434,9 +434,9 @@ is not the business of a call that was asked only to reorder (§9.9).
 
 ## 5. Slide Lifecycle API — `slides/`
 
-**Status:** partial. `resolve_slide` / `slide_index` / `contains` (§5.1) and
-`move_slide` (§5.3) are implemented; `delete_slide` and `duplicate_slide` land
-in Phases 4–5.
+**Status:** partial. `resolve_slide` / `slide_index` / `contains` (§5.1),
+`delete_slide` (§5.2) and `move_slide` (§5.3) are implemented;
+`duplicate_slide` lands in Phase 5.
 
 ### 5.1 Argument normalization
 

@@ -15,6 +15,7 @@ This package depends only on :mod:`pptx_plus.core`, enforced by
 
 from __future__ import annotations
 
+from pptx_plus.slides.delete import delete_slide
 from pptx_plus.slides.move import move_slide
 from pptx_plus.slides.resolve import (
     SlideIndexError,
@@ -28,6 +29,7 @@ __all__ = [
     "SlideIndexError",
     "SlideNotFoundError",
     "contains",
+    "delete_slide",
     "move_slide",
     "resolve_slide",
     "slide_index",

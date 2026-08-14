@@ -208,6 +208,25 @@ def build_hyperlink(path: Path) -> Path:
     return path
 
 
+def build_slide_jump(path: Path) -> Path:
+    """Two slides, the second holding a hyperlink that jumps to the first.
+
+    A slide-jump link is an `RT.SLIDE` relationship on the *linking* slide's
+    part, so slide 1 stays reachable from slide 2 even after it is removed
+    from the running order. The part survives with no `p:sldId` and the link
+    goes nowhere -- a known limitation of v0.1, documented rather than fixed
+    (ROADMAP: `scrub_links`).
+    """
+    prs = Presentation()
+    target = _titled(prs, "Slide 1")
+    linking = _titled(prs, "Slide 2")
+    box = linking.shapes.add_textbox(Inches(1), Inches(3), Inches(4), Inches(1))
+    box.text_frame.text = "Back to slide 1"
+    box.click_action.target_slide = target
+    prs.save(path)
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Structures python-pptx does not model
 # ---------------------------------------------------------------------------
@@ -351,6 +370,7 @@ BUILDERS = {
     "chart": build_chart,
     "two_charts": build_two_charts,
     "hyperlink": build_hyperlink,
+    "slide_jump": build_slide_jump,
     "sections": build_sections,
     "custom_show": build_custom_show,
     "gap_rids": build_gap_rids,

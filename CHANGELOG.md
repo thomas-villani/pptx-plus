@@ -19,6 +19,11 @@ reader nothing they can act on.
   part-name allocation and byte-faithful part cloning, and an upstream-surface
   guard that fails at import with the name of any python-pptx attribute this
   library depends on that has moved.
+- `pptx_plus.slides.delete_slide` — remove a slide, its notes slide, and every
+  part reachable only through it, with its entries scrubbed from every section
+  and custom show. Deleting the last slide is allowed; a second delete raises
+  `SlideNotFoundError`. The deleted `Slide` object stays alive and readable —
+  deletion detaches a part from the relationship graph and destroys nothing.
 - `pptx_plus.slides.move_slide` — reorder a slide, with `to_index` naming its
   position in the *resulting* deck. Out of range raises rather than clamping:
   `list.insert` clamps, which would turn an off-by-one in a caller's loop into

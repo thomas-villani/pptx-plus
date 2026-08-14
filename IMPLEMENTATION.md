@@ -497,3 +497,41 @@ Smaller notes:
   but going through the element says what is meant and survives an upstream
   change to how wrapper objects are cached. Added `Slide.element` to
   `REQUIRED_SURFACE`.
+
+### 2026-08-14 — Session 2 (cont.): Phase 4
+
+`slides/delete.py`. 319 tests, coverage holding at 99%.
+
+Less eventful than budgeted, and the reason is finding 1 from session 1:
+because `save` serializes a reachability walk, "collect the orphaned parts" is
+not a step. Dropping the presentation part's relationship *is* the collection,
+and the notes slide and any unshared image go with it at no cost. The verb is
+four statements.
+
+What needed care was ordering and the choice of removal call:
+
+- **Scrub the side-indexes first**, while both identifiers naming the slide
+  still resolve. Sections key on `sldId/@id`, custom shows on `@r:id`.
+- **`rels.pop`, not `XmlPart.drop_rel`.** Worth recording precisely, because
+  the comment in the code makes a claim that looks like over-caution: after the
+  scrub there is only one `@r:id` reference left, so `drop_rel` *would* work.
+  It is still wrong to use it — correctness would then depend on the ordering
+  of two statements in this function rather than on the removal doing what its
+  name says. `test_a_slide_in_a_custom_show_really_is_referenced_twice` pins
+  the premise so the reasoning stays checkable.
+
+Tests worth keeping honest about: `test_the_package_actually_shrinks` asserts
+on `len(blob)` rather than on part absence, because "the part is not in the
+namelist" is what the naive recipe's *defenders* would also expect to see if
+they only checked the object graph.
+
+Added a `slide_jump` fixture and two tests for the documented v0.1 limitation:
+slide B linking to slide A holds an `RT.SLIDE` rel to A's part, so deleting A
+leaves that part reachable and still written, alive with no `p:sldId`. The
+package remains *valid* — the battery passes — which is exactly why the
+limitation needs its own explicit test rather than trusting the battery to
+notice. `scrub_links=True` is the v0.2 fix.
+
+Still outstanding: PowerPoint has not been running this session, so the manual
+acceptance pass (open each result, confirm no repair prompt) and the
+pptlive-authored `pptx_samples/` are both unstarted.
