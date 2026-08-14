@@ -80,6 +80,10 @@ REQUIRED_SURFACE: tuple[tuple[str, str, str], ...] = (
     ("pptx.oxml.presentation", "CT_SlideIdList.add_sldId", "appending a slide entry"),
     ("pptx.oxml.presentation", "CT_SlideId.id", "the deck-scoped slide id"),
     ("pptx.oxml.presentation", "CT_SlideId.rId", "the part-scoped relationship id"),
+    # --- Slide identity. `resolve_slide` matches a Slide to its position by
+    # --- the identity of its `<p:sld>` element, since python-pptx defines no
+    # --- `__eq__` on Slide and index is not carried on the object.
+    ("pptx.slide", "Slide.element", "locating a slide by element identity"),
     # --- Notes. `has_notes_slide` is the non-mutating test; `notes_slide` is a
     # --- lazyproperty that CREATES parts and must never be used to inspect.
     ("pptx.parts.slide", "SlidePart.has_notes_slide", "testing for notes without creating them"),

@@ -19,6 +19,19 @@ reader nothing they can act on.
   part-name allocation and byte-faithful part cloning, and an upstream-surface
   guard that fails at import with the name of any python-pptx attribute this
   library depends on that has moved.
+- `pptx_plus.slides.move_slide` — reorder a slide, with `to_index` naming its
+  position in the *resulting* deck. Out of range raises rather than clamping:
+  `list.insert` clamps, which would turn an off-by-one in a caller's loop into
+  a silently misordered deck.
+- `pptx_plus.slides`: `resolve_slide`, `slide_index`, and `contains`, plus the
+  `SlideNotFoundError` / `SlideIndexError` pair. Both dual-inherit the stdlib
+  exception a caller would naturally catch, so `except KeyError` still works
+  and `contextlib.suppress(KeyError)` gives opt-in idempotence.
+- `pptx_plus.core.sections` — maintenance for `p14:sectionLst` and
+  `p:custShowLst`, neither of which python-pptx models. They survive its round
+  trips only because unrecognized XML is preserved verbatim, so an operation
+  that edits the slide list and stops leaves them naming a slide that is gone
+  and PowerPoint reports the file as damaged.
 - `pptx_plus._testing`: the OPC integrity battery (SPEC §10.3), which reads a
   saved package as a zip rather than through python-pptx — the in-memory object
   graph keeps stale references after a delete by design, so asserting against

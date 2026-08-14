@@ -43,9 +43,8 @@ from pptx_plus._testing import (
     roundtrip,
     saved,
 )
-from pptx_plus.core.oxml import el, part_root, sld_id_lst, sub
+from pptx_plus.core.oxml import part_root, sld_id_lst
 from pptx_plus.core.parts import clone_part
-from pptx_plus.core.reltypes import EXT_URI_SECTION_LST
 from tests.fixtures.build_decks import BUILDERS
 
 ALL_FIXTURES = sorted(BUILDERS)
@@ -183,8 +182,7 @@ def test_naive_delete_of_a_sectioned_deck_is_caught(deck) -> None:
     the failure that passes every other assertion in the battery and still
     produces a repair prompt on a real user's deck.
     """
-    prs = Presentation(str(deck("simple")))
-    _add_sections(prs)
+    prs = Presentation(str(deck("sections")))
     _naive_delete(prs, 1)
     with pytest.raises(AssertionError, match="I6"):
         assert_sections_consistent(saved(prs))
@@ -192,12 +190,12 @@ def test_naive_delete_of_a_sectioned_deck_is_caught(deck) -> None:
 
 def test_naive_delete_of_a_custom_show_is_caught(deck) -> None:
     """A custom show keys on `r:id`, so it fails differently -- also I6."""
-    prs = Presentation(str(deck("simple")))
-    _add_custom_show(prs)
+    prs = Presentation(str(deck("custom_show")))
     lst = sld_id_lst(prs)
-    r_id = lst[1].rId
-    prs.part.rels.pop(r_id)
-    lst.remove(lst[1])
+    # Slide 0 is *in* the show; deleting a slide the show never named would
+    # not break it, and the test would pass without proving anything.
+    prs.part.rels.pop(lst[0].rId)
+    lst.remove(lst[0])
     with pytest.raises(AssertionError, match="I6"):
         assert_sections_consistent(saved(prs))
 
@@ -331,35 +329,6 @@ def test_assert_parts_disjoint_is_falsifiable(deck) -> None:
 
 def _related(pkg: SavedPackage, partname: str, reltype: str) -> set[str]:
     return {rel.partname for rel in pkg.targets(partname, [reltype]) if rel.partname}
-
-
-def _add_sections(prs: Presentation) -> None:
-    """Give a deck one section per slide, keyed on slide id.
-
-    Hand-built because python-pptx cannot author sections and no generated
-    fixture has them -- which is exactly why I6 needs its own construction
-    here rather than riding along on another fixture.
-    """
-    ext_lst = sub(part_root(prs.part), "p:extLst")
-    ext = sub(ext_lst, "p:ext", uri=EXT_URI_SECTION_LST)
-    section_lst = sub(ext, "p14:sectionLst")
-    for index, sld_id in enumerate(sld_id_lst(prs)):
-        section = sub(
-            section_lst,
-            "p14:section",
-            name=f"Section {index + 1}",
-            id=f"{{00000000-0000-0000-0000-{index:012d}}}",
-        )
-        sub(sub(section, "p14:sldIdLst"), "p14:sldId", id=sld_id.get("id"))
-
-
-def _add_custom_show(prs: Presentation) -> None:
-    """Give a deck one custom show naming every slide by relationship id."""
-    show_lst = sub(part_root(prs.part), "p:custShowLst")
-    show = sub(show_lst, "p:custShow", name="Short version", id="0")
-    sld_lst = sub(show, "p:sldLst")
-    for sld_id in sld_id_lst(prs):
-        sld_lst.append(el("p:sld", **{"r:id": sld_id.rId}))
 
 
 def _corrupt_zip(

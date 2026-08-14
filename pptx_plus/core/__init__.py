@@ -66,6 +66,12 @@ from pptx_plus.core.reltypes import (
     SHARE_RELTYPES,
     STRUCTURAL_RELTYPES,
 )
+from pptx_plus.core.sections import (
+    custom_show_lst,
+    reorder_slide,
+    scrub_slide,
+    section_lst,
+)
 
 __all__ = [
     "BUILD_NSMAP",
@@ -87,6 +93,7 @@ __all__ = [
     "allocate_partname",
     "check_upstream_surface",
     "clone_part",
+    "custom_show_lst",
     "drop_relationship",
     "el",
     "next_slide_id",
@@ -95,6 +102,9 @@ __all__ = [
     "partname_template_for",
     "qn",
     "remove",
+    "reorder_slide",
+    "scrub_slide",
+    "section_lst",
     "sld_id_lst",
     "sub",
     "used_slide_ids",

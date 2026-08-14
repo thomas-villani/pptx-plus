@@ -31,7 +31,8 @@ from pptx.enum.chart import XL_CHART_TYPE
 from pptx.slide import Slide
 from pptx.util import Inches, Pt
 
-from pptx_plus.core.oxml import sub
+from pptx_plus.core.oxml import part_root, sld_id_lst, sub
+from pptx_plus.core.reltypes import EXT_URI_SECTION_LST
 
 #: A 1x1 transparent GIF -- the smallest thing python-pptx accepts as a
 #: picture. Fixtures care that an image part exists and is shared or cloned,
@@ -77,6 +78,11 @@ def build_simple(path: Path, count: int = 3) -> Path:
         _titled(prs, f"Slide {index + 1}")
     prs.save(path)
     return path
+
+
+def build_simple4(path: Path) -> Path:
+    """Four titled slides -- the deck the SPEC §5.5 index table is written for."""
+    return build_simple(path, 4)
 
 
 def build_picture(path: Path) -> Path:
@@ -203,6 +209,72 @@ def build_hyperlink(path: Path) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# Structures python-pptx does not model
+# ---------------------------------------------------------------------------
+#
+# Sections and custom shows are authored by hand here because python-pptx has
+# no API for either -- they survive its round trips only because unrecognized
+# XML is preserved verbatim. That is precisely why they need fixtures: an
+# implementation can pass every test built from generated decks and still
+# corrupt the first deck a real user has organized.
+#
+# The shapes below are cross-checked against PowerPoint-authored samples in
+# `pptx_samples/`, so a hand-built approximation cannot quietly become the
+# only thing the suite has ever seen.
+
+
+def build_sections(path: Path, per_section: int = 2, sections: int = 2) -> Path:
+    """Slides partitioned into named sections, keyed on slide id.
+
+    Sections live in `p:presentation/p:extLst` and reference `p:sldId/@id` --
+    the deck-scoped slide id, not the relationship id and not the index.
+    """
+    prs = Presentation()
+    for index in range(per_section * sections):
+        _titled(prs, f"Slide {index + 1}")
+
+    ext = sub(sub(part_root(prs.part), "p:extLst"), "p:ext", uri=EXT_URI_SECTION_LST)
+    section_lst = sub(ext, "p14:sectionLst")
+    entries = list(sld_id_lst(prs))
+    for number in range(sections):
+        section = sub(
+            section_lst,
+            "p14:section",
+            name=f"Section {number + 1}",
+            id=f"{{00000000-0000-0000-0000-{number:012d}}}",
+        )
+        id_list = sub(section, "p14:sldIdLst")
+        for sld_id in entries[number * per_section : (number + 1) * per_section]:
+            sub(id_list, "p14:sldId", id=sld_id.get("id"))
+
+    prs.save(path)
+    return path
+
+
+def build_custom_show(path: Path) -> Path:
+    """Three slides and a custom show naming the first and third.
+
+    A custom show references slides by `@r:id` -- the *relationship* id on the
+    presentation part, not the slide id sections use. It is also the structure
+    that makes `XmlPart.drop_rel` silently no-op, because the slide is now
+    referenced twice in the presentation part's XML.
+    """
+    prs = Presentation()
+    for index in range(3):
+        _titled(prs, f"Slide {index + 1}")
+
+    show_lst = sub(part_root(prs.part), "p:custShowLst")
+    show = sub(show_lst, "p:custShow", name="Short version", id="0")
+    sld_lst = sub(show, "p:sldLst")
+    entries = list(sld_id_lst(prs))
+    for sld_id in (entries[0], entries[2]):
+        sub(sld_lst, "p:sld", **{"r:id": sld_id.rId})
+
+    prs.save(path)
+    return path
+
+
+# ---------------------------------------------------------------------------
 # Zip surgery -- decks python-pptx will not author
 # ---------------------------------------------------------------------------
 
@@ -272,12 +344,15 @@ def _rewrite_zip(
 BUILDERS = {
     "empty": build_empty,
     "simple": build_simple,
+    "simple4": build_simple4,
     "picture": build_picture,
     "shared_picture": build_shared_picture,
     "notes": build_notes,
     "chart": build_chart,
     "two_charts": build_two_charts,
     "hyperlink": build_hyperlink,
+    "sections": build_sections,
+    "custom_show": build_custom_show,
     "gap_rids": build_gap_rids,
 }
 

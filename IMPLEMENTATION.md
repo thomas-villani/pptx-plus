@@ -455,3 +455,45 @@ Findings from this session:
 `UNQUALIFIED_REL_ID_ATTRS` moved from the planned `relmap.py` to `reltypes.py`:
 the harness needs it three phases before the rewriter exists, and it is a
 constant with two consumers. SPEC §4.3/§4.4 updated.
+
+### 2026-08-14 — Session 2 (cont.): Phase 3
+
+`slides/resolve.py`, `slides/move.py`, `core/sections.py`. 270 tests, 99.29%.
+
+One design question actually had to be settled here, and the SPEC did not
+answer it: **when a slide moves across a section boundary, what happens to the
+sections?**
+
+Two models produce the same running order and disagree about membership. The
+*fixed-boundary* model keeps each section's size and leaves the cut at a fixed
+position; the *moved-slide* model relocates exactly the moved slide, shrinking
+its source section and growing its destination.
+
+Fixed-boundary is what "sections partition the deck" suggests on first reading,
+and it is wrong: moving slide 1 into section 2 drags slide 3 back into
+section 1. A bystander changes section because of a call that never named it.
+Implemented the moved-slide model and asserted the property directly —
+`test_reordering_changes_no_other_slides_section` computes the full
+id-to-section map before and after and requires the diff to be exactly the one
+slide.
+
+The related ambiguity is landing *on* a boundary, where appending to one
+section and prepending to the next are indistinguishable in the running order.
+The tie goes to the section the slide came from, which is what makes
+`move_slide(prs, i, i)` a no-op for the sections as well as for the order —
+and no-op-ness is the SPEC's own acceptance criterion for the index semantics
+(§5.5), so the two now rest on the same property.
+
+Both are recorded in SPEC §4.7, which is new.
+
+Smaller notes:
+
+- `sections` and `custom_show` moved out of the integrity test's local helpers
+  and into `build_decks.py`. Three phases need them now, and a structure that
+  exists only inside one test file is a structure the other tests will quietly
+  do without.
+- `resolve_slide` matches a `Slide` by the identity of its `<p:sld>` element.
+  python-pptx defines no `__eq__` on `Slide`, so equality is identity anyway —
+  but going through the element says what is meant and survives an upstream
+  change to how wrapper objects are cached. Added `Slide.element` to
+  `REQUIRED_SURFACE`.

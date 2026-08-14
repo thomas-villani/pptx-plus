@@ -391,11 +391,52 @@ slide bearing two charts would allocate the same partname twice and one would
 silently overwrite the other. Attaching before recursing is impossible, since
 the parent's relationship does not exist yet; the reservation set is the fix.
 
+### 4.7 `core/sections.py` — sections and custom shows
+
+```python
+def section_lst(prs) -> _Element | None
+def custom_show_lst(prs) -> _Element | None
+def scrub_slide(prs, *, slide_id: int, r_id: str) -> None
+def reorder_slide(prs, *, slide_id: int, to_index: int) -> None
+```
+
+A deck indexes its slides up to three times. `p:sldIdLst` is the running order
+and the only one python-pptx models. `p14:sectionLst`, in
+`p:presentation/p:extLst`, groups slides into the named sections the slide
+sorter shows. `p:custShowLst` names subsets as alternative running orders.
+
+Neither of the latter two is modelled upstream; they survive a round trip only
+because unrecognized XML is preserved verbatim. That is what makes them
+dangerous — an operation that edits `sldIdLst` and stops leaves them pointing
+at a slide that is gone, and PowerPoint reports the file as damaged.
+
+**They key on different identifiers**, which is the trap: sections reference
+`p:sldId/@id`, custom shows reference `@r:id`. Same slide, two names, in one
+file. §3.3. Hence both parameters on `scrub_slide`; call it while both are
+still resolvable, i.e. *before* dropping the relationship.
+
+Two behaviours are contract, not implementation detail:
+
+- **An emptied section or custom show is left in place.** It is a named thing
+  the user created and an empty one is schema-valid. PowerPoint does the same.
+- **A reorder changes exactly one slide's section membership: the one that
+  moved.** Landing on a section boundary is genuinely ambiguous — appending to
+  one section and prepending to the next give the same running order — and the
+  tie goes to the section the slide came from. That is what makes
+  `move_slide(prs, i, i)` a no-op for the sections too. The rejected
+  alternative holds section *sizes* fixed, under which moving slide 1 into
+  section 2 drags slide 3 back into section 1.
+
+A deck whose sections do not cover every slide is left as found. Repairing it
+is not the business of a call that was asked only to reorder (§9.9).
+
 ---
 
 ## 5. Slide Lifecycle API — `slides/`
 
-**Status:** partial. Lands across Phases 3–5.
+**Status:** partial. `resolve_slide` / `slide_index` / `contains` (§5.1) and
+`move_slide` (§5.3) are implemented; `delete_slide` and `duplicate_slide` land
+in Phases 4–5.
 
 ### 5.1 Argument normalization
 
