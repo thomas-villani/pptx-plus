@@ -319,10 +319,19 @@ grows with every Office release and fails **silently** on the additions.
 Two supplements:
 
 - `UNQUALIFIED_REL_ID_ATTRS` (defined in `core/reltypes.py`, §4.3) — a
-  registry of `(element, attribute)` pairs carrying a relationship id *outside*
-  the `r:` namespace. At least one exists in real decks:
-  `dsp:dataModelExt/@relId`, inside a SmartArt data part, pointing at the
-  rendered-drawing part.
+  registry mapping `(element, attribute)` pairs carrying a relationship id
+  *outside* the `r:` namespace to the **scope** their value resolves in. Real
+  decks contain exactly one: `dsp:dataModelExt/@relId`, inside a SmartArt data
+  part, naming the rendered-drawing part.
+
+  **Its scope is the referring part, not its own**, and that is the half that
+  surprises. Every other relationship reference in OOXML is part-scoped
+  (§3.2); this one cannot be, because a diagram data part has no relationships
+  at all. Its `relId` names one on the *slide* that references the diagram.
+  Code that applies the universal rule produces a copy whose diagram points at
+  the original's drawing cache — silently, since PowerPoint recomputes the
+  drawing on open and looks correct while other renderers do not. Verified
+  against a PowerPoint-authored sample, not assumed.
 - `RelIdLiteralWarning` — emitted for any attribute value matching `^rId\d+$`
   that was neither rewritten nor registered. A **warning** at runtime, because
   a shape genuinely named `rId7` must not crash a library call; a **hard
@@ -629,8 +638,16 @@ cloning them faithfully is the whole job.
   library writes.
 - **A cloned XML part is reparsed**, so ignorable inter-element whitespace is
   normalized. This affects only parts the engine actually rewrites; blob-backed
-  parts (all SmartArt definition parts, all media, all embedded packages) are
-  copied as bytes and are unaffected.
+  parts (media, embedded packages, and every SmartArt definition part except
+  the one named below) are copied as bytes and are unaffected.
+- **The SmartArt *data* part is the one blob part that is reparsed**, and the
+  exception is unavoidable rather than an oversight. It carries
+  `dsp:dataModelExt/@relId` naming the rendered-drawing part, so the reference
+  has to change on a copy — bytes that must differ cannot also be identical.
+  python-pptx models no class for this part, so it loads as an opaque blob
+  with no element tree and its bytes must be rewritten *before* `Part.load`;
+  a loaded blob part has no public way to change them. See §4.4 on why that
+  attribute's scope is the referring part.
 
 ### 8.3 What an untouched save must not change
 

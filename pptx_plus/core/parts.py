@@ -116,13 +116,25 @@ def _in_package(package: Package, partname: str) -> bool:
     return any(str(part.partname) == partname for part in package.iter_parts())
 
 
-def clone_part(src: Part, *, into: Package, reserved: set[str]) -> Part:
+def clone_part(
+    src: Part,
+    *,
+    into: Package,
+    reserved: set[str],
+    blob: bytes | None = None,
+) -> Part:
     """Clone ``src`` byte-faithfully into ``into`` under a fresh part name.
 
     Args:
         src: The part to clone.
         into: The destination package.
         reserved: In-flight part-name reservations; see :func:`allocate_partname`.
+        blob: Content for the clone, replacing the source's own bytes. The one
+            caller is the clone engine, for a part whose *contents* hold
+            relationship ids scoped to the referring part — a SmartArt data
+            part — which therefore has to be rewritten before it is loaded
+            rather than after. Everything else takes the default and stays
+            byte-identical. SPEC §4.5.
 
     Returns:
         A new part of the same class and content type. It has **no
@@ -146,7 +158,12 @@ def clone_part(src: Part, *, into: Package, reserved: set[str]) -> Part:
     SPEC §8.1 byte-exact rather than merely close.
     """
     partname = allocate_partname(into, partname_template_for(src), reserved)
-    return type(src).load(partname, src.content_type, into, src.blob)
+    return type(src).load(
+        partname,
+        src.content_type,
+        into,
+        src.blob if blob is None else blob,
+    )
 
 
 def drop_relationship(part: Part, rId: str) -> None:  # noqa: N803 - OOXML spelling

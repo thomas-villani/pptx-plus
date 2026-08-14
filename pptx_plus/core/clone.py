@@ -35,20 +35,31 @@ SPEC §4.5. This module imports only from ``pptx_plus.core`` (SPEC §9.1).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeGuard
 
+from lxml import etree
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.opc.package import XmlPart
 
 from pptx_plus.core.oxml import part_root
-from pptx_plus.core.partgraph import REUSING, Disposition, classify, rel_edges
+from pptx_plus.core.partgraph import REUSING, Disposition, RelEdge, classify, rel_edges
 from pptx_plus.core.parts import clone_part
 from pptx_plus.core.relmap import RelMap, remap_rel_ids
+from pptx_plus.core.reltypes import PARENT_SCOPED_CONTENT_RELTYPES, UNQUALIFIED_REL_ID_ATTRS
 
 if TYPE_CHECKING:
     from pptx.opc.package import Part
     from pptx.package import Package
+
+#: Cheap pre-filter: only reparse a blob when it plausibly holds one of the
+#: registered unqualified attributes. Keeps the exception in SPEC §8.1's
+#: byte-exactness as narrow as it can be -- a diagram data part that carries no
+#: such attribute is still copied byte for byte.
+_CONTAINS_UNQUALIFIED_ID = re.compile(
+    b"|".join(re.escape(attr.encode()) for _, attr in sorted(UNQUALIFIED_REL_ID_ATTRS))
+)
 
 
 @dataclass(frozen=True)
@@ -139,8 +150,17 @@ def clone_part_graph(
         part_map[id(src)] = dst
 
         relmap: RelMap = {}
+        deferred: list[RelEdge] = []
         for edge in rel_edges(src):
             if not policy.with_notes and edge.reltype == RT.NOTES_SLIDE:
+                continue
+
+            # A SmartArt data part's contents name relationships on *this*
+            # part, not on itself, so it cannot be copied until `relmap` is
+            # finished. Held back rather than special-cased downstream, which
+            # keeps the rest of the loop free of the exception. SPEC §4.5.
+            if edge.reltype in PARENT_SCOPED_CONTENT_RELTYPES and not edge.is_external:
+                deferred.append(edge)
                 continue
 
             disposition = classify(edge)
@@ -168,13 +188,43 @@ def clone_part_graph(
 
             relmap[edge.r_id] = dst.relate_to(_clone(target), edge.reltype)
 
+        # `relmap` is complete now, so the held-back parts can be rewritten
+        # against it. Nothing inside such a part references the part itself,
+        # so minting its own relationship afterwards is safe.
+        for edge in deferred:
+            target = edge.target_part
+            assert target is not None
+            child = _clone_parent_scoped(target, relmap)
+            relmap[edge.r_id] = dst.relate_to(child, edge.reltype)
+
         # After every relationship is minted, so the map is complete -- and
-        # per cloned XML part, because a chart's `c:externalData/@r:id` and a
-        # diagram's `@relId` live in sub-parts with maps of their own.
+        # per cloned XML part, because a chart's `c:externalData/@r:id` lives
+        # in a sub-part with a map of its own.
         if _is_xml(dst):
             remap_rel_ids(part_root(dst), relmap, strict=policy.strict)
 
         return dst
+
+    def _clone_parent_scoped(src: Part, parent_relmap: RelMap) -> Part:
+        """Copy a part whose contents name relationships on the referring part.
+
+        python-pptx has no model class for a SmartArt data part, so it loads
+        as an opaque blob with no element tree -- which is why the ordinary
+        rewrite pass skips it entirely, and why a naive implementation leaves
+        the copy's diagram pointing at the *original's* drawing cache with no
+        error anywhere. The bytes have to be rewritten before the part is
+        loaded, because a loaded blob part has no public way to change them.
+
+        This is the one place the library reparses a blob part, so it is the
+        one exception to the byte-exactness of SPEC §8.1 -- and an unavoidable
+        one: the reference has to change, so the bytes cannot stay identical.
+        """
+        blob = src.blob
+        if _CONTAINS_UNQUALIFIED_ID.search(blob):
+            element = etree.fromstring(blob)
+            remap_rel_ids(element, {}, parent=parent_relmap, strict=policy.strict)
+            blob = etree.tostring(element, xml_declaration=True, encoding="UTF-8", standalone=True)
+        return clone_part(src, into=into, reserved=reserved, blob=blob)
 
     return CloneResult(root=_clone(root), part_map=part_map, shared=shared)
 

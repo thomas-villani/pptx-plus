@@ -44,8 +44,17 @@ EXT_URI_SECTION_LST = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 EXT_URI_DATA_MODEL = "{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}"
 
 
+#: Scope value: the id resolves against the relationships of the part that
+#: contains it, like every ``r:``-namespace attribute.
+SCOPE_SELF = "self"
+
+#: Scope value: the id resolves against the relationships of the part that
+#: **refers to** the containing part.
+SCOPE_PARENT = "parent"
+
 #: Relationship-id-bearing attributes that are **not** in the ``r:`` namespace,
-#: as ``(element Clark name, attribute name)`` pairs.
+#: mapping ``(element Clark name, attribute name)`` to the scope its value
+#: resolves in.
 #:
 #: The rewriter's core strategy is a sweep of the ``r:`` namespace, which is
 #: closed by schema and therefore has zero false positives. This registry is
@@ -53,19 +62,36 @@ EXT_URI_DATA_MODEL = "{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}"
 #: exactly one attribute in real decks.
 #:
 #: Inside a SmartArt data part, ``dgm:extLst/a:ext/dsp:dataModelExt/@relId``
-#: points at the ``dsp:`` rendered-drawing part using a bare ``relId``. Miss it
-#: and PowerPoint silently recovers by recomputing the drawing on open, while
-#: every other renderer draws nothing at all — a failure that is invisible in
-#: the one viewer most likely to be used to check.
+#: points at the ``dsp:`` rendered-drawing part. Miss it and PowerPoint
+#: silently recovers by recomputing the drawing on open, while every other
+#: renderer draws nothing at all — a failure invisible in the one viewer most
+#: likely to be used to check.
+#:
+#: **Its scope is the referring part, not its own**, and that is the genuinely
+#: surprising half. The diagram data part has no relationships at all; its
+#: ``relId`` names a relationship on the *slide* that references the diagram.
+#: This is verified against a PowerPoint-authored sample rather than assumed —
+#: see ``tests/fixtures/pptx_samples/README.md``. Every other relationship
+#: reference in OOXML is part-scoped (SPEC §3.2), so code that assumes the
+#: universal rule silently produces a copy whose diagram points at the
+#: *original's* drawing cache.
 #:
 #: The registry is deliberately not a longer list of guesses. Anything *not*
 #: here that still looks like a relationship id is caught by the unclaimed-
 #: literal detector (SPEC §4.4), which is how the next one gets found.
-UNQUALIFIED_REL_ID_ATTRS: frozenset[tuple[str, str]] = frozenset(
-    {
-        (qn("dsp:dataModelExt"), "relId"),
-    }
-)
+UNQUALIFIED_REL_ID_ATTRS: dict[tuple[str, str], str] = {
+    (qn("dsp:dataModelExt"), "relId"): SCOPE_PARENT,
+}
+
+#: Relationship types whose **target part's content** holds parent-scoped
+#: relationship ids — i.e. ids naming relationships on the part that refers to
+#: it, not on itself.
+#:
+#: The clone engine has to treat these specially: the target cannot be copied
+#: until the referring part's relationship map is complete, because rewriting
+#: its contents needs that map. Expressed as data so the engine keeps no
+#: per-part-type branch. SPEC §4.5.
+PARENT_SCOPED_CONTENT_RELTYPES: frozenset[str] = frozenset({RT.DIAGRAM_DATA})
 
 
 # ---------------------------------------------------------------------------
@@ -171,8 +197,11 @@ __all__ = [
     "DIAGRAM_RELTYPES",
     "EXT_URI_DATA_MODEL",
     "EXT_URI_SECTION_LST",
+    "PARENT_SCOPED_CONTENT_RELTYPES",
     "PARTNAME_TEMPLATES",
     "REUSE_RELTYPES",
+    "SCOPE_PARENT",
+    "SCOPE_SELF",
     "RT_DIAGRAM_DRAWING",
     "SHARE_RELTYPES",
     "STRUCTURAL_RELTYPES",

@@ -26,6 +26,13 @@ reader nothing they can act on.
   cannot reach back into the original. Every relationship id inside the copied
   XML is rewritten — the step every circulating recipe omits, and the reason
   `deepcopy(slide.element)` produces a slide whose pictures silently vanish.
+- SmartArt survives a duplicate correctly, including
+  `dsp:dataModelExt/@relId` — the one relationship id in a real deck that sits
+  outside the `r:` namespace **and** resolves against the referring part rather
+  than the one containing it. python-pptx models no class for a diagram data
+  part, so it loads as an opaque blob whose bytes have to be rewritten before
+  `Part.load`. Getting this wrong leaves the copy's diagram pointing at the
+  original's drawing cache, with no error and no repair prompt.
 - `pptx_plus.core.clone`, `.partgraph`, `.relmap` — the copy engine. The
   relationship-id rewrite sweeps the `r:` namespace rather than allowlisting
   element names: the namespace is closed by schema, so a sweep has no false

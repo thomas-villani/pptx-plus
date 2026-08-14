@@ -580,3 +580,63 @@ Left uncovered deliberately: the early-return in `clone.py`'s `_clone`. It is
 unreachable through the current call structure — the edge loop consults the map
 before recursing — but it is the termination guard for a deep cycle, and a
 `pragma: no cover` on a real safety branch reads worse than one uncovered line.
+
+### 2026-08-14 — Session 2 (cont.): Phase 6, and what the samples caught
+
+Property tests, the runnable example, the LibreOffice tier, the API reference,
+and the committed PowerPoint samples. 499 tests, 99%+.
+
+**The samples paid for themselves on the first run**, which is the entry worth
+keeping. Authored through `pptlive` (Tom's COM driver) rather than by hand, so
+they are reproducible and the click-path is a script rather than a memory.
+
+`smartart.pptx` exposed two defects, both invisible to every generated fixture:
+
+1. **The harness rejected valid PowerPoint output.** `dsp:dataModelExt/@relId`
+   resolves against the relationships of the part that *refers* to the diagram
+   data part — which has none of its own. `assert_rel_ids_resolve` checked it
+   against the containing part and reported a pristine, PowerPoint-authored
+   deck as damaged. Step 1 of the SPEC §10.5 grading procedure ("passes on
+   valid input") is what caught it, and it only caught it once the valid input
+   was something PowerPoint made.
+2. **`duplicate_slide` silently produced a wrong deck.** python-pptx has no
+   model class for a diagram data part, so it loads as an opaque blob with no
+   element tree, and `_is_xml` was False — the rewrite pass skipped it
+   entirely. The copy kept the source's `relId` and its diagram pointed at the
+   *original's* drawing cache. No exception, no repair prompt: PowerPoint
+   recomputes the drawing on open and looks fine.
+
+Defect 2 is the exact failure mode this library exists to prevent, reproduced
+in the library itself. It survived Phase 5 because the only SmartArt in the
+project until now was a `dsp:dataModelExt` element I constructed by hand in a
+unit test — which had the attribute but not the *scope*, since a synthetic
+element has no surrounding package to be wrong about.
+
+The fix has three parts: the registry records a scope per attribute;
+`remap_rel_ids` takes a `parent` map; and the engine defers cloning
+parent-scoped parts until the referring part's map is complete, rewriting
+their bytes before `Part.load` because a loaded blob part has no public way to
+change them. That makes the data part the one blob part this library reparses
+— unavoidable, since the reference has to change, and now stated in SPEC §8.2
+rather than left as an unadvertised exception.
+
+Manual acceptance ran for real, not as a checklist item: duplicated the
+SmartArt slide, opened in PowerPoint (no repair prompt), rendered both slides
+with `pptlive snapshot` and compared them, saved from PowerPoint, reopened,
+re-ran the battery, and duplicated again from PowerPoint's own output.
+PowerPoint's re-save kept two independent five-part diagram sets, which is the
+real confirmation the copy was not an alias.
+
+Two smaller things:
+
+- **Enabling the `RelIdLiteralWarning` filter in `pyproject.toml` broke the
+  coverage gate**, dropping the total from 99% to 60% with whole modules at
+  0%. Pytest resolves an ini `filterwarnings` entry by importing the named
+  class at config time, before coverage starts. Moved to `pytest_configure`.
+  The symptom points nowhere near the cause.
+- **`ruff format` rewrites Python inside Markdown fences**, so a bare
+  `ruff format` was silently editing `SPEC.md` and `notes/`. `*.md` excluded.
+
+Still open: no embedded-video sample (pptlive has no media verb, so it needs a
+manual Insert > Video), and the `custom_show` fixture remains hand-built and
+unverified against PowerPoint's own shape.

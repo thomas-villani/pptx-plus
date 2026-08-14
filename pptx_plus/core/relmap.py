@@ -33,7 +33,11 @@ from typing import TYPE_CHECKING
 
 from pptx_plus.core.errors import PptxPlusError
 from pptx_plus.core.ns import R
-from pptx_plus.core.reltypes import UNQUALIFIED_REL_ID_ATTRS
+from pptx_plus.core.reltypes import (
+    SCOPE_PARENT,
+    SCOPE_SELF,
+    UNQUALIFIED_REL_ID_ATTRS,
+)
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -75,7 +79,7 @@ class RelIdLiteralWarning(UserWarning):
     """
 
 
-def _rel_id_attrs(root: etree._Element) -> list[tuple[etree._Element, str, str]]:
+def _rel_id_attrs(root: etree._Element) -> list[tuple[etree._Element, str, str, str]]:
     """Collect every ``(element, attribute, value)`` holding a relationship id.
 
     Two sources, and the asymmetry between them is the design.
@@ -100,29 +104,50 @@ def _rel_id_attrs(root: etree._Element) -> list[tuple[etree._Element, str, str]]
     Everything outside the ``r:`` namespace has to be registered by name, in
     :data:`~pptx_plus.core.reltypes.UNQUALIFIED_REL_ID_ATTRS`.
 
+    Each result carries the **scope** its value resolves in: ``SCOPE_SELF``
+    for the containing part's own relationships, which is every
+    ``r:``-namespace attribute and the universal rule, or ``SCOPE_PARENT`` for
+    the referring part's — see :data:`UNQUALIFIED_REL_ID_ATTRS`.
+
     Returns the results as a list rather than a generator: the caller mutates
     the attributes it is handed, and collecting first keeps the traversal
     separate from the mutation.
     """
-    found: list[tuple[etree._Element, str, str]] = []
+    found: list[tuple[etree._Element, str, str, str]] = []
     for node in root.iter():
         if not isinstance(node.tag, str):
             continue  # a comment or processing instruction
         for key, value in node.attrib.items():
             name = str(key)
-            if name.startswith(_R_PREFIX) or (node.tag, name) in UNQUALIFIED_REL_ID_ATTRS:
-                found.append((node, name, str(value)))
+            if name.startswith(_R_PREFIX):
+                found.append((node, name, str(value), SCOPE_SELF))
+            else:
+                scope = UNQUALIFIED_REL_ID_ATTRS.get((node.tag, name))
+                if scope is not None:
+                    found.append((node, name, str(value), scope))
     return found
 
 
-def remap_rel_ids(root: etree._Element, relmap: RelMap, *, strict: bool = True) -> int:
+def remap_rel_ids(
+    root: etree._Element,
+    relmap: RelMap,
+    *,
+    parent: RelMap | None = None,
+    strict: bool = True,
+) -> int:
     """Rewrite every relationship-id attribute beneath ``root``, in place.
 
     Args:
         root: The root element of a cloned XML part.
-        relmap: Source relationship id -> clone relationship id.
-        strict: Raise on an id absent from the map. When False, an unmapped id
-            is left alone.
+        relmap: Source relationship id -> clone relationship id, for this
+            part's own relationships.
+        parent: The same, for the part that **refers to** this one. Required
+            only when this part contains a parent-scoped attribute — in
+            practice, a SmartArt data part's ``dsp:dataModelExt/@relId``.
+            Defaults to ``relmap``, which is right for every part whose
+            references are all part-scoped.
+        strict: Raise on an id absent from the applicable map. When False, an
+            unmapped id is left alone.
 
     Returns:
         The number of attributes rewritten.
@@ -161,17 +186,20 @@ def remap_rel_ids(root: etree._Element, relmap: RelMap, *, strict: bool = True) 
         >>> node.get(qn("r:embed"))
         'rId2'
     """
+    scopes = {SCOPE_SELF: relmap, SCOPE_PARENT: relmap if parent is None else parent}
+
     edits: list[tuple[etree._Element, str, str]] = []
-    for node, name, value in _rel_id_attrs(root):
+    for node, name, value, scope in _rel_id_attrs(root):
         if not value:
             continue
-        replacement = relmap.get(value)
+        applicable = scopes[scope]
+        replacement = applicable.get(value)
         if replacement is None:
             if strict:
+                where = "the source part" if scope == SCOPE_SELF else "the referring part"
                 raise DanglingRelationshipError(
                     f"<{_local(node)} {_local_attr(name)}={value!r}> names a relationship "
-                    f"that does not exist on the source part. Known ids: "
-                    f"{sorted(relmap)}"
+                    f"that does not exist on {where}. Known ids: {sorted(applicable)}"
                 )
             continue
         edits.append((node, name, replacement))

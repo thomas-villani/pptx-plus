@@ -101,6 +101,20 @@ Hard-won, and every one of them has bitten a naive implementation.
   `[Content_Types].xml` from the same tuple. Dropping a relationship *is*
   collecting the part. SPEC §3.5.
 
+- **`dsp:dataModelExt/@relId` is scoped to the *referring* part.** Every other
+  relationship reference in OOXML resolves against the part that contains it.
+  This one does not: a SmartArt data part has no relationships at all, and its
+  `relId` names one on the slide that references the diagram. Code that
+  assumes the universal rule produces a copy whose diagram points at the
+  *original's* drawing cache — silently, because PowerPoint recomputes the
+  drawing on open and looks fine.
+
+- **python-pptx loads diagram parts as opaque blobs.** There is no model class
+  for them, so they have no element tree and any pass that only walks
+  `XmlPart`s skips them entirely — including the relationship-id rewrite. They
+  are the one part type whose bytes must be rewritten before `load`, since a
+  loaded blob part has no public way to change them.
+
 - **`ruff format` reformats Python inside Markdown fences.** `*.md` is in
   `extend-exclude` for that reason — without it, a bare `uv run ruff format`
   rewrites `SPEC.md` and `notes/`, and `--check` in CI goes red on any snippet

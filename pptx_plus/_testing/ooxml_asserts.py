@@ -48,7 +48,11 @@ from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx_plus.core.ids import MAX_SLIDE_ID, MIN_SLIDE_ID
 from pptx_plus.core.ns import qn
 from pptx_plus.core.oxml import xpath
-from pptx_plus.core.reltypes import EXT_URI_SECTION_LST, UNQUALIFIED_REL_ID_ATTRS
+from pptx_plus.core.reltypes import (
+    EXT_URI_SECTION_LST,
+    SCOPE_SELF,
+    UNQUALIFIED_REL_ID_ATTRS,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -102,6 +106,7 @@ class SavedPackage:
         self.partnames: tuple[str, ...] = tuple("/" + name for name in self.entries)
         self._xml_cache: dict[str, etree._Element] = {}
         self._rels_cache: dict[str, dict[str, Rel]] = {}
+        self._referrer_cache: dict[str, set[str]] | None = None
 
     # -- raw access --------------------------------------------------------
 
@@ -364,14 +369,17 @@ def assert_slide_ids_valid(pkg: SavedPackage) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _iter_rel_id_attrs(root: etree._Element) -> Iterator[tuple[etree._Element, str, str]]:
-    """Yield ``(element, attribute name, value)`` for every rel-id attribute.
+def _iter_rel_id_attrs(root: etree._Element) -> Iterator[tuple[etree._Element, str, str, str]]:
+    """Yield ``(element, attribute name, value, scope)`` for every rel-id attribute.
 
     Two sources, and the asymmetry between them is deliberate. The ``r:``
     namespace is swept wholesale because it is closed by schema -- nine
     attributes, every one a relationship reference -- so a sweep has no false
     positives by construction. Everything else has to be registered by name,
     because those namespaces are open.
+
+    The scope says which part's relationships the value resolves against:
+    its own (the universal rule) or the referring part's.
     """
     for node in root.iter():
         if not isinstance(node.tag, str):
@@ -379,9 +387,11 @@ def _iter_rel_id_attrs(root: etree._Element) -> Iterator[tuple[etree._Element, s
         for key, value in node.attrib.items():
             name = str(key)
             if name.startswith(_R_PREFIX):
-                yield node, name, str(value)
-            elif (node.tag, name) in UNQUALIFIED_REL_ID_ATTRS:
-                yield node, name, str(value)
+                yield node, name, str(value), SCOPE_SELF
+            else:
+                scope = UNQUALIFIED_REL_ID_ATTRS.get((node.tag, name))
+                if scope is not None:
+                    yield node, name, str(value), scope
 
 
 def assert_rel_ids_resolve(pkg: SavedPackage) -> None:
@@ -395,21 +405,65 @@ def assert_rel_ids_resolve(pkg: SavedPackage) -> None:
     An empty value is not a dangling reference. ``<a:hlinkClick r:id="">`` is
     the ordinary encoding of an action-only hyperlink, and a real deck is full
     of them.
+
+    A **parent-scoped** id resolves against the relationships of whichever
+    part refers to the one holding it, not its own. A SmartArt data part has
+    no relationships at all and still carries a ``relId``; checking that
+    against its own (empty) set would report every PowerPoint-authored diagram
+    as damaged. Resolving it in any referring part is enough -- a data part
+    referenced by two slides is legal, and the id is meaningful in each.
     """
+    referrers = _referrers(pkg)
     for partname in pkg.iter_reachable():
         content_type = pkg.content_type(partname)
         if not _is_xml(content_type):
             continue
-        rels = pkg.rels(partname)
-        for node, name, value in _iter_rel_id_attrs(pkg.xml(partname)):
+        # Both id sets are computed once per part, not per attribute: a busy
+        # slide has hundreds of `r:` attributes and rebuilding the set for
+        # each one dominated the whole test suite's runtime.
+        own = frozenset(pkg.rels(partname))
+        inherited: frozenset[str] | None = None
+
+        for node, name, value, scope in _iter_rel_id_attrs(pkg.xml(partname)):
             if not value:
                 continue
-            if value not in rels:
-                raise AssertionError(
-                    f"I4: {partname} has a dangling relationship reference: "
-                    f"<{etree.QName(node).localname} {name}={value!r}> but "
-                    f"{partname} declares only {sorted(rels)}"
+            if scope == SCOPE_SELF:
+                if value in own:
+                    continue
+                where = f"{partname} declares only {sorted(own)}"
+            else:
+                if inherited is None:
+                    sources: set[str] = referrers.get(partname, set())
+                    inherited = frozenset(r_id for source in sources for r_id in pkg.rels(source))
+                if value in inherited:
+                    continue
+                where = (
+                    f"no part referring to it "
+                    f"({sorted(referrers.get(partname, set()))}) declares it"
                 )
+            raise AssertionError(
+                f"I4: {partname} has a dangling relationship reference: "
+                f"<{etree.QName(node).localname} {name}={value!r}> but {where}"
+            )
+
+
+def _referrers(pkg: SavedPackage) -> dict[str, set[str]]:
+    """Return ``{partname: parts that hold a relationship to it}``, memoized.
+
+    Needed only to resolve parent-scoped ids, but the index is over the whole
+    graph, and the battery calls this assertion on every package it grades --
+    including once per generated example in the property tests. Memoized on
+    the package because a `SavedPackage` is immutable: it wraps one fixed
+    blob, so the answer cannot change.
+    """
+    if pkg._referrer_cache is None:
+        result: dict[str, set[str]] = {}
+        for source in ("/", *pkg.iter_reachable()):
+            for rel in pkg.rels(source).values():
+                if rel.partname:
+                    result.setdefault(rel.partname, set()).add(source)
+        pkg._referrer_cache = result
+    return pkg._referrer_cache
 
 
 def assert_no_unclaimed_rid_literals(pkg: SavedPackage) -> None:
