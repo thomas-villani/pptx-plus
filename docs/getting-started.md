@@ -19,9 +19,7 @@ rather than replacing it — you keep your `Presentation` object and reach for
 ## The three verbs
 
 !!! note "In development"
-    v0.1 is not released yet. The API below is the contract from
-    [`SPEC.md`](https://github.com/thomas-villani/pptx-plus/blob/main/SPEC.md);
-    this page will gain runnable output once the verbs land.
+    v0.1 is not released yet. Install from the repository until it is.
 
 ```python
 from pptx import Presentation
@@ -29,8 +27,8 @@ from pptx_plus.slides import delete_slide, duplicate_slide, move_slide
 
 prs = Presentation("deck.pptx")
 
-# Duplicate slide 0 and place the copy immediately after it.
-copy = duplicate_slide(prs, 0, to_index=1)
+# Duplicate slide 0. The copy lands immediately after it.
+copy = duplicate_slide(prs, 0)
 
 # Move the last slide to the front.
 move_slide(prs, -1, 0)
@@ -43,6 +41,47 @@ prs.save("deck.pptx")
 
 Every verb accepts either an index or a `Slide` object, and indices follow
 Python list semantics — `-1` is the last slide.
+
+For a runnable version with each step verified against the saved package:
+
+```bash
+python -m pptx_plus.examples.slide_lifecycle
+```
+
+## Asking about a slide
+
+```python
+from pptx_plus.slides import contains, slide_index
+
+slide_index(prs, some_slide)   # position, or SlideNotFoundError
+contains(prs, some_slide)      # the same question, without the exception
+```
+
+A deleted `Slide` object stays alive and readable — deletion detaches its part
+from the relationship graph, it destroys nothing — so "is this slide still in
+the deck?" is a question you have to ask the deck, not the slide.
+
+## Errors
+
+Every exception subclasses `PptxPlusError` **and** the stdlib type you would
+naturally catch:
+
+| Raised | Also a | When |
+|---|---|---|
+| `SlideNotFoundError` | `KeyError` | The slide is not in this deck |
+| `SlideIndexError` | `IndexError` | An index is out of range |
+| `DanglingRelationshipError` | `ValueError` | The source XML names a relationship that does not exist |
+
+So `except PptxPlusError` catches everything this library raises, while
+existing `except KeyError` clauses keep working. That dual inheritance is also
+what makes idempotence opt-in rather than imposed:
+
+```python
+import contextlib
+
+with contextlib.suppress(KeyError):
+    delete_slide(prs, slide)   # fine if it is already gone
+```
 
 ## Two things worth knowing up front
 
@@ -78,3 +117,4 @@ omits, and the reason the copy's pictures survive.
 
 - [Concepts: the OPC model](concepts/opc-model.md) — what a `.pptx` actually
   is, and why relationship ids are the crux.
+- [API reference](reference/slides.md) — every public function.

@@ -47,6 +47,11 @@ nav:
   - Concepts:
       - concepts/index.md
       - The OPC model: concepts/opc-model.md
+  - Reference:
+      - reference/index.md
+      - pptx_plus.slides: reference/slides.md
+      - pptx_plus.core: reference/core.md
+      - pptx_plus._testing: reference/testing.md
   - Changelog: https://github.com/thomas-villani/pptx-plus/blob/main/CHANGELOG.md
   - Contributing: https://github.com/thomas-villani/pptx-plus/blob/main/CONTRIBUTING.md
 

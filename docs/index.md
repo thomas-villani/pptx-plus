@@ -31,7 +31,7 @@ from pptx import Presentation
 from pptx_plus.slides import duplicate_slide
 
 prs = Presentation("deck.pptx")
-copy = duplicate_slide(prs, 0, to_index=1)
+copy = duplicate_slide(prs, 0)
 prs.save("deck.pptx")
 ```
 
