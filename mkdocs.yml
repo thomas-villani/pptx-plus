@@ -1,0 +1,85 @@
+site_name: pptx_plus
+site_description: OPC-level extensions for python-pptx — delete, move, and duplicate slides with correct relationship and part handling.
+site_author: Tom Villani, PhD
+site_url: https://thomas-villani.github.io/pptx-plus/
+
+repo_url: https://github.com/thomas-villani/pptx-plus
+repo_name: thomas-villani/pptx-plus
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+# The nav grows with the code and never ahead of it. Under `strict: true` a
+# nav entry naming a file that does not exist is a build failure, and a
+# mkdocstrings `::: pptx_plus.core.ns` directive fails before that module is
+# written — which is the desired behaviour, not an obstacle to work around.
+# Guides, concepts, and reference stubs arrive with the modules they document.
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Concepts:
+      - concepts/index.md
+      - The OPC model: concepts/opc-model.md
+  - Changelog: https://github.com/thomas-villani/pptx-plus/blob/main/CHANGELOG.md
+  - Contributing: https://github.com/thomas-villani/pptx-plus/blob/main/CONTRIBUTING.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: true
+            show_signature_annotations: true
+            members_order: source
+            separate_signature: true
+            line_length: 80
+            merge_init_into_class: true
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+
+strict: true
