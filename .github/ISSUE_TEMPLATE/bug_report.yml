@@ -1,0 +1,123 @@
+name: Bug report
+description: Something in pptx_plus behaves incorrectly or produces a broken package.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The single most useful thing you can attach is a
+        **minimal `.pptx`** that reproduces the problem.
+
+        If the deck is sensitive, the next best thing is the *shape* of the
+        package rather than its content: `unzip -l deck.pptx` plus the
+        offending `ppt/slides/_rels/slideN.xml.rels`. Most bugs here are
+        relationship-graph bugs, and those are visible in the rels file
+        without exposing any of your text.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+      placeholder: |
+        After duplicate_slide, PowerPoint shows a repair prompt on open and
+        the picture is missing from the copy.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: >
+        The smallest script that shows the problem. If it needs an input deck,
+        please attach one (drag and drop it into this field) or include the
+        code that builds it.
+      render: python
+      placeholder: |
+        from pptx import Presentation
+        from pptx_plus.slides import duplicate_slide
+
+        prs = Presentation("repro.pptx")
+        duplicate_slide(prs, 0)
+        prs.save("out.pptx")
+    validations:
+      required: true
+
+  - type: textarea
+    id: xml
+    attributes:
+      label: Relevant package XML
+      description: >
+        Optional but very helpful. A `.pptx` is a ZIP, so
+        `unzip -p deck.pptx ppt/slides/_rels/slide1.xml.rels` and
+        `unzip -p deck.pptx ppt/presentation.xml` will get you there. For a
+        duplicate/delete bug, the `.rels` file is usually where the answer is.
+      render: xml
+
+  - type: input
+    id: pptx-plus-version
+    attributes:
+      label: pptx_plus version
+      description: "`uv run python -c \"import pptx_plus; print(pptx_plus.__version__)\"`"
+    validations:
+      required: true
+
+  - type: input
+    id: deps
+    attributes:
+      label: python-pptx / lxml / Python versions
+      description: "`uv run python -c \"import pptx, lxml.etree, sys; print(pptx.__version__, lxml.etree.__version__, sys.version)\"`"
+      placeholder: "1.0.2 / 5.2.1 / 3.12.4"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 / macOS 14 / Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: input
+    id: powerpoint-version
+    attributes:
+      label: PowerPoint version (if the bug is about how PowerPoint opens the output)
+      description: >
+        OOXML edge cases are often version-specific, so this matters more than
+        it looks. LibreOffice Impress, Keynote, or Google Slides is also worth
+        naming — and note that none of those run the SmartArt layout engine,
+        so a diagram that is blank there may be correct.
+      placeholder: "Microsoft 365 / PowerPoint 2019 / LibreOffice Impress 24.2"
+
+  - type: dropdown
+    id: deck-features
+    attributes:
+      label: Does the deck use any of these?
+      description: >
+        These are the features whose side-indexes python-pptx does not model,
+        and they are the most common cause of a corrupted result.
+      multiple: true
+      options:
+        - PowerPoint sections
+        - Custom shows
+        - SmartArt diagrams
+        - Embedded video or audio
+        - Charts
+        - Embedded OLE objects (Excel, Visio, …)
+        - Slide-jump hyperlinks
+        - None of these / not sure
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest release of `pptx_plus`.
+          required: true
+        - label: >
+            I checked that this is a `pptx_plus` bug and not a python-pptx one
+            (i.e. saving and reopening the deck with python-pptx alone, without
+            calling any `pptx_plus` function, does not reproduce it).
+          required: false

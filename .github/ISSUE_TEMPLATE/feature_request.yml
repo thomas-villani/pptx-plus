@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a capability for pptx_plus.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing: `pptx_plus` is a **lean extension** to python-pptx, not
+        a deck-authoring framework. The charter is "things python-pptx cannot
+        do at the OPC layer, done correctly." Ideas outside that get routed to
+        sibling projects rather than absorbed.
+
+        Two things are permanent non-goals, documented in `ROADMAP.md` §
+        *Considered, not on the roadmap*:
+
+        - **Animations and transitions.**
+        - **A SmartArt layout engine.** The layout part is a declarative
+          layout *program* that PowerPoint executes to compute geometry.
+          Reimplementing it is not feasible; template-clone *authoring* is a
+          separate, tractable idea that is on the roadmap.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        The task, not the proposed API. What does the deck need to look like at
+        the end, and what are you doing today instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: gap
+    attributes:
+      label: Why can't python-pptx do it?
+      description: >
+        A link to the relevant python-pptx issue or docs section is ideal. If
+        python-pptx *can* do it and the ask is for a nicer wrapper, say so —
+        that is a real request, it is just weighed differently.
+    validations:
+      required: true
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API, if you have one in mind
+      render: python
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: >
+            I checked `ROADMAP.md` — including the "Considered, not on the
+            roadmap" section — and this is not already listed.
+          required: true

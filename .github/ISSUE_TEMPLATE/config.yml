@@ -1,0 +1,17 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/thomas-villani/pptx-plus/discussions
+    about: >
+      Not sure whether something is a bug? Asking how to accomplish a deck
+      task? Start a discussion — it is the better venue and stays searchable.
+
+  - name: Documentation
+    url: https://thomas-villani.github.io/pptx-plus/
+    about: >
+      The API index, the OPC model this library operates on, and what the
+      copy engine does and does not preserve.
+
+  - name: Report a security vulnerability
+    url: https://github.com/thomas-villani/pptx-plus/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.

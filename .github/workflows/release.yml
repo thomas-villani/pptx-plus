@@ -1,0 +1,95 @@
+name: Release
+
+# Fires on a tag push matching v0.1.0, v1.2.3, etc. The tag is the release
+# trigger — the version in pyproject.toml should already match before tagging.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# `id-token: write` is required for PyPI trusted publishing.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gate:
+    name: Full CI gate
+    # The release gate IS the PR gate — lint, typecheck, min-deps, the whole
+    # test matrix (Windows included), and the wheel-import smoke. Re-declaring
+    # a subset of those jobs here is how a release gate quietly ends up weaker
+    # than the gate every PR already had to pass.
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build distribution artifacts
+    needs: [gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Verify tag matches pyproject version
+        # Belt-and-braces: stop early if someone tags v0.2.0 while pyproject
+        # still says version = "0.1.0". Python is used (not sed) so the check
+        # is identical on Linux and Windows runners and a malformed regex
+        # can't silently pass.
+        shell: python
+        env:
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          import os
+          import sys
+          import tomllib
+
+          tag_ref = os.environ["GITHUB_REF"]
+          tag_version = tag_ref.removeprefix("refs/tags/v")
+          with open("pyproject.toml", "rb") as f:
+              project_version = tomllib.load(f)["project"]["version"]
+          if tag_version != project_version:
+              print(
+                  f"::error::Tag v{tag_version} does not match "
+                  f"pyproject.toml version {project_version}"
+              )
+              sys.exit(1)
+          print(f"Tag and pyproject.toml agree on version {tag_version}")
+
+      - name: Build distribution
+        run: uv build
+
+      - name: Upload built artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-dist
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      # The 'pypi' GitHub environment scopes the trusted-publishing claim.
+      # Configure under Repo Settings → Environments before the first tag.
+      name: pypi
+      url: https://pypi.org/p/pptx-plus
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        # Trusted publishing: register the repo as a publisher at
+        # https://pypi.org/manage/account/publishing/ — no API token in
+        # secrets. For a project that does not exist on PyPI yet this is a
+        # *pending* publisher, and it must be registered before the first tag.
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,70 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Pages-deployment permissions. The build job doesn't strictly need them, but
+# they're scoped here so both jobs share one definition.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize Pages deployments without cancelling in-flight ones — losing a
+# half-deployed Pages run leaves the live site in an inconsistent state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build MkDocs site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync dependencies
+        run: uv sync --python 3.13 --extra dev
+
+      - name: Build site (strict mode)
+        # --strict turns mkdocs warnings into errors, so broken links and
+        # missing nav targets fail CI rather than silently shipping. This is
+        # also why the nav grows with the code and never ahead of it: a nav
+        # entry naming a file that does not exist yet fails here, and a
+        # mkdocstrings `::: pptx_plus.core.ns` directive fails before that
+        # module is written.
+        run: uv run mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    # Only deploy from a push to main — PR builds stop at the build smoke
+    # test, so contributors don't accidentally publish from a branch.
+    #
+    # Repo Settings → Pages → Source must be set to "GitHub Actions" before
+    # this job first runs, or it fails with an opaque error.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

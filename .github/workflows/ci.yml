@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Called by release.yml so the release gate IS the PR gate, byte for byte.
+  # Re-declaring these jobs in the release workflow is how a release gate
+  # quietly ends up weaker than the gate it is supposed to mirror.
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync dependencies
+        run: uv sync --python 3.13 --extra dev
+
+      - name: ruff check
+        run: uv run ruff check pptx_plus/ tests/
+
+      - name: ruff format --check
+        run: uv run ruff format --check pptx_plus/ tests/
+
+  typecheck:
+    name: Type check (mypy --strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Sync dependencies
+        run: uv sync --python 3.13 --extra dev
+
+      - name: mypy --strict
+        run: uv run mypy --strict pptx_plus/
+
+  min-deps:
+    name: Lower-bound deps (python-pptx==1.0.2, lxml==4.9.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.10
+
+      - name: Sync dependencies
+        # Pin runtime deps to their declared minimums in pyproject.toml so we
+        # exercise the lower bound users might pin against. Dev deps stay
+        # floating.
+        run: |
+          uv sync --python 3.10 --extra dev
+          uv pip install "python-pptx==1.0.2" "lxml==4.9.0"
+
+      - name: Run pytest
+        run: uv run --python 3.10 pytest -q --no-cov
+
+  test:
+    name: Test ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is a first-class matrix entry, not an `include:`
+        # afterthought. The primary dev box runs Windows, and this library is
+        # zip-partname work — OPC part names are always forward-slashed on
+        # every platform, and the fastest way to get that wrong is to develop
+        # it only where `os.sep` happens to agree.
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --python ${{ matrix.python-version }} --extra dev
+
+      - name: Install LibreOffice (for Layer 3 smoke tests)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-impress
+
+      - name: Run pytest with coverage
+        # SPEC §13 gate. Enforced via `fail_under = 90` in pyproject.toml's
+        # [tool.coverage.report]; `--cov-fail-under=90` here is redundant
+        # insurance against someone loosening the config.
+        run: uv run --python ${{ matrix.python-version }} pytest --cov=pptx_plus --cov-report=term --cov-report=xml --cov-fail-under=90
+
+      - name: Upload coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  build:
+    name: Build wheel + sdist (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Build distribution
+        run: uv build
+
+      - name: Import the built wheel in a clean environment
+        # Building is not the same as being installable. This catches a
+        # subpackage missing from the wheel, or a dropped py.typed, before a
+        # release rather than after one.
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          uv run --isolated --no-project --with "$WHEEL" python -c "
+          import pptx_plus, importlib.resources
+          print('version:', pptx_plus.__version__)
+          assert importlib.resources.files('pptx_plus').joinpath('py.typed').is_file(), 'py.typed missing from wheel'
+          "
+
+      - name: Upload built artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
