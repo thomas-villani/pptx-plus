@@ -110,6 +110,23 @@ STRUCTURAL_RELTYPES: frozenset[str] = frozenset(
     }
 )
 
+#: Relationship types naming another *slide* in the same deck. Never cloned:
+#: duplicating a slide that links to slide 4 must produce a slide that links to
+#: slide 4, not one that drags a second copy of slide 4 along with it.
+#:
+#: Kept separate from :data:`STRUCTURAL_RELTYPES` deliberately, even though
+#: both mean "reuse the target" today. Structural relationships are the
+#: cross-deck seam (SPEC §6), where the layout chain gets imported into the
+#: target deck; a slide-jump target has entirely different cross-deck
+#: semantics, and folding the two together would silently give it the wrong
+#: ones the moment §6 lands.
+#:
+#: This does **not** cover the notes slide's relationship *back* to its own
+#: slide, which is a cycle rather than a reference to a third party. The clone
+#: map resolves that: by the time the notes slide is cloned its source slide is
+#: already mapped, so the back-reference lands on the clone. SPEC §4.5.
+REUSE_RELTYPES: frozenset[str] = frozenset({RT.SLIDE})
+
 #: The four ECMA-376 SmartArt definition relationship types plus the Microsoft
 #: drawing-cache extension. Not consulted by the clone engine — they are all
 #: deep-cloned by the default rule, with no special case — but named here
@@ -155,6 +172,7 @@ __all__ = [
     "EXT_URI_DATA_MODEL",
     "EXT_URI_SECTION_LST",
     "PARTNAME_TEMPLATES",
+    "REUSE_RELTYPES",
     "RT_DIAGRAM_DRAWING",
     "SHARE_RELTYPES",
     "STRUCTURAL_RELTYPES",

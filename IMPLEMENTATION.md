@@ -535,3 +535,48 @@ notice. `scrub_links=True` is the v0.2 fix.
 Still outstanding: PowerPoint has not been running this session, so the manual
 acceptance pass (open each result, confirm no repair prompt) and the
 pptlive-authored `pptx_samples/` are both unstarted.
+
+### 2026-08-14 — Session 2 (cont.): Phase 5
+
+`core/relmap.py`, `core/partgraph.py`, `core/clone.py`, `slides/duplicate.py`.
+453 tests, 99.38%. Budgeted as "the cliff"; it was the smoothest phase, because
+Phase 1's primitives and Phase 2's oracle had already absorbed the risk. The
+duplicate tests passed on the first run.
+
+**A category the plan did not have.** `RT.SLIDE` is neither shareable nor
+structural nor deep. A slide-jump hyperlink is a relationship to *another
+slide*, so deep-cloning it would make duplicating slide 2 silently produce a
+second copy of slide 1 as well. Added `REUSE_RELTYPES` and a `Disposition.REUSE`
+rather than widening `STRUCTURAL_RELTYPES`: both mean "reuse the target" today,
+but structural relationships are the cross-deck seam where the layout chain gets
+*imported*, and a slide-jump target has entirely different cross-deck semantics.
+Merging them would have handed §6 the wrong behaviour silently.
+
+The notes back-reference is *not* this case, and the distinction is worth
+keeping straight: notesSlide -> slide is a cycle, not a reference to a third
+party. The clone map already resolves it, which is why the map is consulted
+*before* the disposition rather than after.
+
+**The `to_index` default changed from the plan.** Scope-notes said "appends
+unless to_index given"; asked, and the answer was adjacent placement, matching
+PowerPoint's Duplicate Slide. `to_index=-1` appends. SPEC §5.4 updated.
+
+**The coverage gate broke for a reason unrelated to the tests.** Enabling
+`filterwarnings = ["error::pptx_plus.core.relmap.RelIdLiteralWarning"]` in
+`pyproject.toml` — the TODO left in Phase 0 — dropped total coverage from 99%
+to 60%, with whole modules reading 0%. Pytest resolves an ini filter by
+importing the named class at config time, which imports `pptx_plus` before
+coverage starts, so every module-level statement records as unexecuted. Moved
+the registration to `pytest_configure` in `tests/conftest.py`, where the
+warnings plugin parses it per test item long after coverage is running. Worth
+recording because the symptom points nowhere near the cause: nothing about a
+warning filter suggests a coverage number.
+
+Added `test_the_warning_is_fatal_in_this_suite`, which fails if the promotion
+is ever lost. `pytest.warns` passes with or without the filter, so every other
+warning test would have kept passing.
+
+Left uncovered deliberately: the early-return in `clone.py`'s `_clone`. It is
+unreachable through the current call structure — the edge loop consults the map
+before recursing — but it is the termination guard for a deep cycle, and a
+`pragma: no cover` on a real safety branch reads worse than one uncovered line.

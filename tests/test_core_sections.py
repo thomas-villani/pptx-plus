@@ -14,6 +14,7 @@ from pptx_plus._testing import assert_sections_consistent, roundtrip, saved
 from pptx_plus.core.oxml import sld_id_lst, xpath
 from pptx_plus.core.sections import (
     custom_show_lst,
+    insert_slide,
     reorder_slide,
     scrub_slide,
     section_lst,
@@ -233,3 +234,49 @@ def test_reordering_when_sections_do_not_cover_the_deck(sectioned: Presentation)
         entry.getparent().remove(entry)
     reorder_slide(sectioned, slide_id=256, to_index=3)
     assert _section_ids(sectioned) == [[257, 256], []]
+
+
+# ---------------------------------------------------------------------------
+# insert_slide
+# ---------------------------------------------------------------------------
+
+
+def test_inserting_places_the_entry_at_its_deck_position(sectioned: Presentation) -> None:
+    insert_slide(sectioned, slide_id=300, to_index=1)
+    assert _section_ids(sectioned) == [[256, 300, 257], [258, 259]]
+
+
+def test_inserting_at_a_boundary_prefers_the_earlier_section(
+    sectioned: Presentation,
+) -> None:
+    """A duplicate placed after the last slide of a section joins that section."""
+    insert_slide(sectioned, slide_id=300, to_index=2)
+    assert _section_ids(sectioned) == [[256, 257, 300], [258, 259]]
+
+
+def test_inserting_at_the_end_joins_the_last_section(sectioned: Presentation) -> None:
+    insert_slide(sectioned, slide_id=300, to_index=4)
+    assert _section_ids(sectioned) == [[256, 257], [258, 259, 300]]
+
+
+def test_inserting_is_a_no_op_without_sections(deck) -> None:
+    prs = Presentation(str(deck("simple")))
+    insert_slide(prs, slide_id=300, to_index=0)
+    assert section_lst(prs) is None
+
+
+def test_inserting_beyond_what_the_sections_cover_falls_back_to_the_last(
+    sectioned: Presentation,
+) -> None:
+    """A deck can arrive with sections that omit slides.
+
+    Rather than drop the new slide out of the sections entirely -- which would
+    leave the partition incomplete and the slide unexplainably absent from the
+    slide sorter's grouping -- it lands at the end of the last section.
+    """
+    root = section_lst(sectioned)
+    assert root is not None
+    for entry in xpath(root, "./p14:section[2]/p14:sldIdLst/p14:sldId"):
+        entry.getparent().remove(entry)
+    insert_slide(sectioned, slide_id=300, to_index=9)
+    assert _section_ids(sectioned) == [[256, 257], [300]]

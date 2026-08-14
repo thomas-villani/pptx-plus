@@ -26,6 +26,7 @@ short form is what the docs use.
 from __future__ import annotations
 
 from pptx_plus.core._compat import UpstreamSurfaceError, check_upstream_surface
+from pptx_plus.core.clone import ClonePolicy, CloneResult, clone_part_graph
 from pptx_plus.core.errors import PptxPlusError
 from pptx_plus.core.ids import (
     MAX_SLIDE_ID,
@@ -50,12 +51,19 @@ from pptx_plus.core.oxml import (
     sub,
     xpath,
 )
+from pptx_plus.core.partgraph import Disposition, RelEdge, classify, rel_edges
 from pptx_plus.core.parts import (
     UnclonablePartError,
     allocate_partname,
     clone_part,
     drop_relationship,
     partname_template_for,
+)
+from pptx_plus.core.relmap import (
+    DanglingRelationshipError,
+    RelIdLiteralWarning,
+    RelMap,
+    remap_rel_ids,
 )
 from pptx_plus.core.reltypes import (
     DIAGRAM_RELTYPES,
@@ -68,6 +76,7 @@ from pptx_plus.core.reltypes import (
 )
 from pptx_plus.core.sections import (
     custom_show_lst,
+    insert_slide,
     reorder_slide,
     scrub_slide,
     section_lst,
@@ -85,22 +94,34 @@ __all__ = [
     "RT_DIAGRAM_DRAWING",
     "SHARE_RELTYPES",
     "STRUCTURAL_RELTYPES",
+    "ClonePolicy",
+    "CloneResult",
+    "DanglingRelationshipError",
+    "Disposition",
     "InvalidNamespaceError",
     "PptxPlusError",
+    "RelEdge",
+    "RelIdLiteralWarning",
+    "RelMap",
     "SlideIdRangeError",
     "UnclonablePartError",
     "UpstreamSurfaceError",
     "allocate_partname",
     "check_upstream_surface",
+    "classify",
     "clone_part",
+    "clone_part_graph",
     "custom_show_lst",
     "drop_relationship",
     "el",
+    "insert_slide",
     "next_slide_id",
     "ordered_insert",
     "part_root",
     "partname_template_for",
     "qn",
+    "rel_edges",
+    "remap_rel_ids",
     "remove",
     "reorder_slide",
     "scrub_slide",

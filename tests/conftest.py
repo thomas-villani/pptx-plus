@@ -19,6 +19,28 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Promote `RelIdLiteralWarning` to an error for the whole suite.
+
+    `RelIdLiteralWarning` is the tripwire for a relationship-id attribute the
+    rewriter does not know about (SPEC §4.4). At runtime it stays a warning,
+    because a shape genuinely named "rId7" must not crash a library call. In
+    the test suite it has to be fatal -- that is how the next
+    `dsp:dataModelExt/@relId` gets found instead of silently producing a
+    dangling reference in someone's deck.
+
+    Registered here rather than as a `filterwarnings` entry in
+    `pyproject.toml` because pytest resolves an ini filter by importing the
+    named class at config time. That imports `pptx_plus` before coverage
+    starts, so every module-level statement in the package records as
+    unexecuted and the total reads ~60% instead of ~98% -- a coverage gate
+    that fails for a reason having nothing to do with the tests. Appending the
+    filter from `pytest_configure` leaves the import to the warnings plugin,
+    which parses filters per test item, long after coverage is running.
+    """
+    config.addinivalue_line("filterwarnings", "error::pptx_plus.core.relmap.RelIdLiteralWarning")
+
+
 @pytest.fixture(scope="session")
 def fixture_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The directory generated fixture decks are built into."""

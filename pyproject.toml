@@ -157,15 +157,13 @@ markers = [
     "requires_libreoffice: smoke tests that need `soffice` on PATH",
 ]
 addopts = "-ra"
-# TODO(phase-5): add
-#     filterwarnings = ["error::pptx_plus.core.relmap.RelIdLiteralWarning"]
-# when `core/relmap.py` lands. RelIdLiteralWarning is the tripwire for an
-# unrecognized relationship-id attribute (SPEC §4.4). At runtime it stays a
-# warning, because a shape genuinely named "rId7" must not crash a library
-# call; in the test suite it must be a hard failure — that is how the next
-# `dsp:dataModelExt/@relId` gets found instead of silently producing a
-# dangling reference. A filter naming a not-yet-importable module makes
-# pytest error at collection, so it cannot be added before the module exists.
+# NOTE: `RelIdLiteralWarning` is promoted to an error for the test suite, but
+# the filter is registered in `tests/conftest.py` rather than here. Pytest
+# resolves a `filterwarnings` ini entry by **importing the named class at
+# config time** — which imports `pptx_plus` before coverage starts, so every
+# module-level statement in the package records as unexecuted and total
+# coverage reads ~60% instead of ~98%. Registering the same filter from
+# `pytest_configure` defers the import past coverage startup.
 
 [tool.coverage.run]
 source = ["pptx_plus"]

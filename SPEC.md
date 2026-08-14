@@ -236,9 +236,7 @@ is the actual work, and every recipe skips it.**
 
 ## 4. Core Foundation API — `core/`
 
-**Status:** partial. `errors`, `ns`, `oxml`, `reltypes`, `ids`, `parts` and
-`_compat` are implemented; `relmap`, `partgraph`, `clone` and `sections` land
-across Phases 3–5.
+**Status:** stable for v0.1. All of `core/` is implemented.
 
 ### 4.1 `core/ns.py`
 
@@ -278,6 +276,18 @@ part — plus the two policy sets that drive the clone engine:
 - `SHARE_RELTYPES` — image, media, video, audio, font, thumbnail.
 - `STRUCTURAL_RELTYPES` — slideLayout, slideMaster, notesMaster, theme,
   handoutMaster. This is the v0.2 seam (§6).
+- `REUSE_RELTYPES` — `RT.SLIDE`. A relationship naming another slide in the
+  same deck, as a slide-jump hyperlink does. Never cloned: duplicating a slide
+  that links to slide 4 must produce a slide that links to slide 4. Kept
+  separate from `STRUCTURAL_RELTYPES` even though both mean "reuse the target"
+  today, because structural relationships are the cross-deck seam where the
+  layout chain gets *imported* — and a slide-jump target has entirely
+  different cross-deck semantics. Folding them together would silently give it
+  the wrong ones the moment §6 lands.
+
+  This does **not** cover a notes slide's relationship back to its own slide,
+  which is a cycle rather than a reference to a third party. The clone map
+  resolves that (§4.5).
 - `UNQUALIFIED_REL_ID_ATTRS` — `(element, attribute)` pairs carrying a
   relationship id *outside* the `r:` namespace; see §4.4 for what it is for.
   It lives here rather than in `relmap.py` because it is a constant with two
@@ -434,9 +444,7 @@ is not the business of a call that was asked only to reorder (§9.9).
 
 ## 5. Slide Lifecycle API — `slides/`
 
-**Status:** partial. `resolve_slide` / `slide_index` / `contains` (§5.1),
-`delete_slide` (§5.2) and `move_slide` (§5.3) are implemented;
-`duplicate_slide` lands in Phase 5.
+**Status:** stable for v0.1. All of §5.1–§5.8 is implemented.
 
 ### 5.1 Argument normalization
 
@@ -491,6 +499,15 @@ Clones within the same deck and returns the new `Slide`. Images and media are
 shared by reference; charts with their embedded workbooks, SmartArt definition
 parts, embedded objects, and — unless `with_notes=False` — the notes slide are
 deep-cloned. Every relationship id inside the cloned XML is rewritten.
+
+**`to_index` defaults to immediately after the source**, matching PowerPoint's
+own Duplicate Slide and what the word "duplicate" leads a caller to expect.
+`to_index=-1` appends. The range is the deck *with* the copy in it, so for a
+four-slide deck `0..4` are valid.
+
+A slide-jump hyperlink points at the **same** slide it did before: the copy
+links to slide 4, it does not bring a second copy of slide 4 with it. See
+`REUSE_RELTYPES` in §4.3.
 
 `with_notes` defaults to `True` because PowerPoint's own Duplicate Slide keeps
 speaker notes, and because the costs are asymmetric: losing notes is

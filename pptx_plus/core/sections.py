@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pptx_plus.core.oxml import part_root, remove, xpath
+from pptx_plus.core.oxml import el, part_root, remove, xpath
 from pptx_plus.core.reltypes import EXT_URI_SECTION_LST
 
 if TYPE_CHECKING:
@@ -157,24 +157,89 @@ def reorder_slide(prs: Presentation, *, slide_id: int, to_index: int) -> None:
     origin = entry.getparent()
     remove(entry)
 
+    if not _place(sections_root, entry, to_index, origin=origin):
+        # Only reachable when the sections do not cover the whole deck, which
+        # means the deck arrived that way. Put the entry back where it was
+        # rather than inventing a placement.
+        origin.append(entry)
+
+
+def insert_slide(prs: Presentation, *, slide_id: int, to_index: int) -> None:
+    """Add a section entry for a newly created slide at its deck position.
+
+    Args:
+        prs: The presentation.
+        slide_id: The new slide's ``p:sldId/@id``.
+        to_index: The new slide's index in the deck.
+
+    Nothing happens if the deck has no sections. If it does, the new slide
+    joins whichever section its position falls in — which for a duplicate
+    placed next to its source is the source's own section, matching what
+    PowerPoint's Duplicate Slide does.
+
+    Leaving a new slide out of every section would be the alternative, and it
+    is worse: the sections would no longer cover the deck, which is a state
+    PowerPoint can produce but does not itself create, and the slide would
+    vanish from the slide sorter's grouping without explanation.
+
+    Landing on a boundary resolves toward the *earlier* section, so a
+    duplicate placed immediately after a slide that ends a section joins that
+    section rather than opening the next one.
+    """
+    sections_root = section_lst(prs)
+    if sections_root is None:
+        return
+
+    entry = el("p14:sldId", id=str(slide_id))
+    if not _place(sections_root, entry, to_index, origin=None):
+        id_lists = xpath(sections_root, "./p14:section/p14:sldIdLst")
+        if id_lists:
+            id_lists[-1].append(entry)
+
+
+def _place(
+    sections_root: etree._Element,
+    entry: etree._Element,
+    to_index: int,
+    *,
+    origin: etree._Element | None,
+) -> bool:
+    """Insert ``entry`` at flattened position ``to_index`` across the sections.
+
+    Args:
+        sections_root: The ``<p14:sectionLst>``.
+        entry: A detached ``<p14:sldId>``.
+        to_index: Position in the deck's running order.
+        origin: The section list the entry came from, for the boundary
+            tie-break, or None when the entry is new.
+
+    Returns:
+        True if a home was found; False if the sections do not reach that far.
+
+    Sections partition the running order, so a deck position maps to a
+    (section, offset) pair by walking the sections and consuming their
+    lengths. Only the boundary case is interesting — ``offset == count`` means
+    "after the last entry of this section" and "before the first entry of the
+    next" describe the same running order. The tie goes to ``origin`` when
+    there is one, which is what makes a reorder to the same index a no-op, and
+    to the earlier section otherwise.
+    """
     id_lists = xpath(sections_root, "./p14:section/p14:sldIdLst")
     offset = to_index
     for position, id_list in enumerate(id_lists):
         count = len(id_list)
         is_last = position == len(id_lists) - 1
-        if offset < count or (offset == count and (id_list is origin or is_last)):
+        boundary_is_ours = id_list is origin or origin is None or is_last
+        if offset < count or (offset == count and boundary_is_ours):
             id_list.insert(offset, entry)
-            return
+            return True
         offset -= count
-
-    # Only reachable when the sections do not cover the whole deck, which
-    # means the deck arrived that way. Put the entry back where it was rather
-    # than inventing a placement.
-    origin.append(entry)
+    return False
 
 
 __all__ = [
     "custom_show_lst",
+    "insert_slide",
     "reorder_slide",
     "scrub_slide",
     "section_lst",

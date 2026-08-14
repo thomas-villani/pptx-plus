@@ -19,6 +19,18 @@ reader nothing they can act on.
   part-name allocation and byte-faithful part cloning, and an upstream-surface
   guard that fails at import with the name of any python-pptx attribute this
   library depends on that has moved.
+- `pptx_plus.slides.duplicate_slide` — copy a slide within its deck, landing
+  immediately after the source by default. Images and media are shared by
+  reference; charts with their embedded workbooks, SmartArt definition parts,
+  embedded objects and the notes slide are copied, so editing the duplicate
+  cannot reach back into the original. Every relationship id inside the copied
+  XML is rewritten — the step every circulating recipe omits, and the reason
+  `deepcopy(slide.element)` produces a slide whose pictures silently vanish.
+- `pptx_plus.core.clone`, `.partgraph`, `.relmap` — the copy engine. The
+  relationship-id rewrite sweeps the `r:` namespace rather than allowlisting
+  element names: the namespace is closed by schema, so a sweep has no false
+  positives, while an element allowlist is keyed on a vocabulary that grows
+  with every Office release and fails silently on each addition.
 - `pptx_plus.slides.delete_slide` — remove a slide, its notes slide, and every
   part reachable only through it, with its entries scrubbed from every section
   and custom show. Deleting the last slide is allowed; a second delete raises
