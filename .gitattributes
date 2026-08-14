@@ -1,0 +1,14 @@
+# Normalize line endings. The dev box is Windows and CI runs Linux, so
+# without this every file round-trips as CRLF in the index and diffs are
+# noise. Text is stored LF in the repo and checked out per-platform.
+* text=auto
+
+# Fixture decks and any other package payloads are binary. A .pptx is a zip;
+# CRLF translation would corrupt one silently.
+*.pptx binary
+*.docx binary
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.mp4 binary

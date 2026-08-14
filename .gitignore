@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+.eggs/
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Generated fixtures (rebuilt by tests/fixtures/build_decks.py).
+#
+# The glob is non-recursive, so the hand-authored decks committed under
+# tests/fixtures/pptx_samples/ are unaffected — see the provenance README
+# there. That looks contradictory at a glance; it is not.
+tests/fixtures/*.pptx
+
+# Build artifacts from docs
+site/
+docs/_build/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# uv
+# Keep uv.lock committed; ignore uv's local cache only
+.uv-cache/
+
+# Claude Code machine-local settings
+.claude/settings.local.json
+
+# Personal notes/todo
+todo.md
