@@ -124,7 +124,17 @@ warn_unused_configs = true
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-extend-exclude = ["tests/fixtures/*.pptx"]
+extend-exclude = [
+    "tests/fixtures/*.pptx",
+    # Ruff formats fenced Python inside Markdown, which means a bare
+    # `ruff format` silently rewrites prose files. That is wrong here twice
+    # over: `notes/` is a historical record that must not be edited after the
+    # fact, and the snippets in SPEC.md and docs/ are illustrative — elided
+    # signatures and hand-wrapped call sites chosen for a narrow column, not
+    # code anyone runs. Left enabled, `ruff format --check` in CI would go red
+    # on a contributor's perfectly good example.
+    "*.md",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "D"]

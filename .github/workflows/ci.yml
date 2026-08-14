@@ -157,7 +157,7 @@ jobs:
         run: |
           WHEEL=$(ls dist/*.whl)
           uv run --isolated --no-project --with "$WHEEL" python -c "
-          import pptx_plus, importlib.resources
+          import pptx_plus, pptx_plus.core, pptx_plus._testing, importlib.resources
           print('version:', pptx_plus.__version__)
           assert importlib.resources.files('pptx_plus').joinpath('py.typed').is_file(), 'py.typed missing from wheel'
           "

@@ -101,6 +101,19 @@ Hard-won, and every one of them has bitten a naive implementation.
   `[Content_Types].xml` from the same tuple. Dropping a relationship *is*
   collecting the part. SPEC §3.5.
 
+- **`ruff format` reformats Python inside Markdown fences.** `*.md` is in
+  `extend-exclude` for that reason — without it, a bare `uv run ruff format`
+  rewrites `SPEC.md` and `notes/`, and `--check` in CI goes red on any snippet
+  a human wrapped deliberately. If a doc example ever needs canonical
+  formatting, format it by hand.
+
+- **An OPC part-name extension is not `posixpath.splitext`.** The extension is
+  the text after the final `.` of the final segment, so `/_rels/.rels` has
+  extension `rels` — while `splitext` treats the leading dot as a hidden-file
+  marker and reports none. Every `.rels` part in a package resolves its content
+  type through the `rels` Default, so getting this wrong fails on every valid
+  deck rather than on an exotic one.
+
 - **Assert against the saved package, never the in-memory `Presentation`.**
   The in-memory object graph keeps stale references after a delete by design;
   the serialized package is the artifact that is actually clean. Asserting in

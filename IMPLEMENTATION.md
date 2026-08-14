@@ -180,6 +180,7 @@ script looking at a real package. Not reading about it — looking at it.
 
 ```python
 from pptx import Presentation
+
 prs = Presentation("some-real-deck.pptx")
 for r in prs.part.rels.values():
     print(r.rId, r.reltype.rsplit("/", 1)[-1], r.target_partname if not r.is_external else "EXT")
@@ -216,8 +217,8 @@ dict-splatted. That is ugly and it is the price of one chokepoint.
 **Query with XPath variables, never f-strings.**
 
 ```python
-xpath(root, "./p:sldId[@r:id=$rid]", rid=r_id)     # yes
-xpath(root, f"./p:sldId[@r:id='{r_id}']")          # no
+xpath(root, "./p:sldId[@r:id=$rid]", rid=r_id)  # yes
+xpath(root, f"./p:sldId[@r:id='{r_id}']")  # no
 ```
 
 **Prefer public python-pptx API even when private is shorter.** The clone
@@ -317,9 +318,9 @@ Every operation test follows the same shape:
 ```python
 prs = Presentation(fixture_path)
 duplicate_slide(prs, 0)
-reopened = roundtrip(prs)          # save to BytesIO, reopen — SPEC §10.2
-assert_rel_ids_resolve(reopened)   # the battery
-assert ...                         # the one thing this test is about
+reopened = roundtrip(prs)  # save to BytesIO, reopen — SPEC §10.2
+assert_rel_ids_resolve(reopened)  # the battery
+assert ...  # the one thing this test is about
 ```
 
 For a new fixture, write the test that *fails* first and confirm it fails for
@@ -416,3 +417,41 @@ Phase 0 landed: packaging, CI (with `workflow_call` reuse so the release gate
 is the PR gate, Windows as a first-class matrix entry, and a wheel-import
 smoke), SPEC, ROADMAP, CHANGELOG, CLAUDE.md, these notes, and the docs
 skeleton.
+
+### 2026-08-14 — Session 2: Phases 1–2
+
+Phase 1 landed the foundation: `ns`, `oxml`, `_compat`, `reltypes`, `ids`,
+`parts`. Two private-API accessors library-wide, both in `oxml.py`, both
+covered by `test_upstream_surface.py`.
+
+Phase 2 landed the integrity harness *before* the verbs it grades, and graded
+it in three steps: it passes on every generated fixture, it fails on each naive
+recipe from SPEC §3.6 with the specific invariant named, and every individual
+assertion has a targeted falsification so none passes vacuously.
+
+Findings from this session:
+
+1. **The harness must read the zip, not the model.** Settled while writing it,
+   and it turned out to also be what makes the harness gradeable at all: it can
+   be pointed at a package this library never wrote, including deliberately
+   corrupted ones built by zip surgery. A model-level assertion could not.
+2. **`posixpath.splitext` is wrong for OPC extensions.** `/_rels/.rels` has
+   extension `rels`; `splitext` reads the leading dot as a hidden-file marker
+   and reports none. Every `.rels` part resolves through the `rels` Default, so
+   this made the content-type check fail on every valid deck — caught only
+   because step 1 of the grading runs against known-good input first. An oracle
+   built after the code it grades would have been "fixed" by weakening it.
+3. **`Default Extension="xml"` limits what a content-type check can detect.**
+   A slide that loses its specific Override still resolves to
+   `application/xml`, so the assertion cannot see it. Stated as a limit in the
+   docstring rather than papered over; the falsification test uses an extension
+   nobody declares, which is the case that actually occurs.
+4. **`<a:hlinkClick r:id="">` has to be authored by hand.** An empty
+   relationship id is ordinary — every action-only link is one — but
+   python-pptx's hyperlink API only ever mints a relationship, so no generated
+   deck contains it. Without the fixture, the harness would have reported every
+   real deck's action buttons as dangling references.
+
+`UNQUALIFIED_REL_ID_ATTRS` moved from the planned `relmap.py` to `reltypes.py`:
+the harness needs it three phases before the rewriter exists, and it is a
+constant with two consumers. SPEC §4.3/§4.4 updated.

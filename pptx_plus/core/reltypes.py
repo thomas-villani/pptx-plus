@@ -17,6 +17,8 @@ from __future__ import annotations
 from pptx.opc.constants import CONTENT_TYPE as CT
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 
+from pptx_plus.core.ns import qn
+
 # ---------------------------------------------------------------------------
 # Constants python-pptx omits.
 # ---------------------------------------------------------------------------
@@ -40,6 +42,30 @@ EXT_URI_SECTION_LST = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 #: ``<a:ext uri=…>`` for the SmartArt data-model extension, holding
 #: ``dsp:dataModelExt`` and its unqualified ``@relId``.
 EXT_URI_DATA_MODEL = "{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}"
+
+
+#: Relationship-id-bearing attributes that are **not** in the ``r:`` namespace,
+#: as ``(element Clark name, attribute name)`` pairs.
+#:
+#: The rewriter's core strategy is a sweep of the ``r:`` namespace, which is
+#: closed by schema and therefore has zero false positives. This registry is
+#: the documented set of exceptions to that closure — and it exists because of
+#: exactly one attribute in real decks.
+#:
+#: Inside a SmartArt data part, ``dgm:extLst/a:ext/dsp:dataModelExt/@relId``
+#: points at the ``dsp:`` rendered-drawing part using a bare ``relId``. Miss it
+#: and PowerPoint silently recovers by recomputing the drawing on open, while
+#: every other renderer draws nothing at all — a failure that is invisible in
+#: the one viewer most likely to be used to check.
+#:
+#: The registry is deliberately not a longer list of guesses. Anything *not*
+#: here that still looks like a relationship id is caught by the unclaimed-
+#: literal detector (SPEC §4.4), which is how the next one gets found.
+UNQUALIFIED_REL_ID_ATTRS: frozenset[tuple[str, str]] = frozenset(
+    {
+        (qn("dsp:dataModelExt"), "relId"),
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -132,4 +158,5 @@ __all__ = [
     "RT_DIAGRAM_DRAWING",
     "SHARE_RELTYPES",
     "STRUCTURAL_RELTYPES",
+    "UNQUALIFIED_REL_ID_ATTRS",
 ]

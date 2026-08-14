@@ -236,7 +236,9 @@ is the actual work, and every recipe skips it.**
 
 ## 4. Core Foundation API — `core/`
 
-**Status:** partial. `errors` implemented; the rest lands across Phases 1–5.
+**Status:** partial. `errors`, `ns`, `oxml`, `reltypes`, `ids`, `parts` and
+`_compat` are implemented; `relmap`, `partgraph`, `clone` and `sections` land
+across Phases 3–5.
 
 ### 4.1 `core/ns.py`
 
@@ -276,6 +278,13 @@ part — plus the two policy sets that drive the clone engine:
 - `SHARE_RELTYPES` — image, media, video, audio, font, thumbnail.
 - `STRUCTURAL_RELTYPES` — slideLayout, slideMaster, notesMaster, theme,
   handoutMaster. This is the v0.2 seam (§6).
+- `UNQUALIFIED_REL_ID_ATTRS` — `(element, attribute)` pairs carrying a
+  relationship id *outside* the `r:` namespace; see §4.4 for what it is for.
+  It lives here rather than in `relmap.py` because it is a constant with two
+  consumers: the rewriter that must remap those attributes, and the integrity
+  harness that must recognize them as relationship ids rather than report them
+  as unclaimed literals. The harness is built first (§10.5), so a registry
+  owned by the rewriter would not exist yet when it is first needed.
 
 ### 4.4 `core/relmap.py`
 
@@ -299,10 +308,11 @@ grows with every Office release and fails **silently** on the additions.
 
 Two supplements:
 
-- `UNQUALIFIED_REL_ID_ATTRS` — a registry of `(element, attribute)` pairs
-  carrying a relationship id *outside* the `r:` namespace. At least one exists
-  in real decks: `dsp:dataModelExt/@relId`, inside a SmartArt data part,
-  pointing at the rendered-drawing part.
+- `UNQUALIFIED_REL_ID_ATTRS` (defined in `core/reltypes.py`, §4.3) — a
+  registry of `(element, attribute)` pairs carrying a relationship id *outside*
+  the `r:` namespace. At least one exists in real decks:
+  `dsp:dataModelExt/@relId`, inside a SmartArt data part, pointing at the
+  rendered-drawing part.
 - `RelIdLiteralWarning` — emitted for any attribute value matching `^rId\d+$`
   that was neither rewritten nor registered. A **warning** at runtime, because
   a shape genuinely named `rId7` must not crash a library call; a **hard

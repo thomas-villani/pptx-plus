@@ -14,3 +14,13 @@ reader nothing they can act on.
 - Repository scaffolding: packaging, tooling, CI, the specification, and the
   implementation notes. No capability code yet — see `ROADMAP.md` for the v0.1
   target.
+- `pptx_plus.core`: the foundation layer — namespaces, the element chokepoint,
+  relationship-type constants and clone policy sets, slide-id allocation,
+  part-name allocation and byte-faithful part cloning, and an upstream-surface
+  guard that fails at import with the name of any python-pptx attribute this
+  library depends on that has moved.
+- `pptx_plus._testing`: the OPC integrity battery (SPEC §10.3), which reads a
+  saved package as a zip rather than through python-pptx — the in-memory object
+  graph keeps stale references after a delete by design, so asserting against
+  it grades the wrong artifact. Shipped in the wheel so downstream projects can
+  assert the same invariants against their own decks.

@@ -13,7 +13,8 @@ the discussion artifact that preceded the repository.
 
 ## Current state — v0.1.0 in development
 
-No releases yet. The v0.1 target:
+No releases yet. `core/` (less `relmap`, `partgraph`, `clone`, `sections`) and
+`_testing/` are implemented; `slides/` is next. The v0.1 target:
 
 | Module | Surface |
 |---|---|
