@@ -27,6 +27,14 @@ from __future__ import annotations
 
 from pptx_plus.core._compat import UpstreamSurfaceError, check_upstream_surface
 from pptx_plus.core.errors import PptxPlusError
+from pptx_plus.core.ids import (
+    MAX_SLIDE_ID,
+    MIN_SLIDE_ID,
+    SlideIdRangeError,
+    next_slide_id,
+    used_slide_ids,
+    validate_slide_id,
+)
 from pptx_plus.core.ns import (
     BUILD_NSMAP,
     NSMAP,
@@ -42,20 +50,54 @@ from pptx_plus.core.oxml import (
     sub,
     xpath,
 )
+from pptx_plus.core.parts import (
+    UnclonablePartError,
+    allocate_partname,
+    clone_part,
+    drop_relationship,
+    partname_template_for,
+)
+from pptx_plus.core.reltypes import (
+    DIAGRAM_RELTYPES,
+    EXT_URI_DATA_MODEL,
+    EXT_URI_SECTION_LST,
+    PARTNAME_TEMPLATES,
+    RT_DIAGRAM_DRAWING,
+    SHARE_RELTYPES,
+    STRUCTURAL_RELTYPES,
+)
 
 __all__ = [
     "BUILD_NSMAP",
+    "DIAGRAM_RELTYPES",
+    "EXT_URI_DATA_MODEL",
+    "EXT_URI_SECTION_LST",
+    "MAX_SLIDE_ID",
+    "MIN_SLIDE_ID",
     "NSMAP",
+    "PARTNAME_TEMPLATES",
+    "RT_DIAGRAM_DRAWING",
+    "SHARE_RELTYPES",
+    "STRUCTURAL_RELTYPES",
     "InvalidNamespaceError",
     "PptxPlusError",
+    "SlideIdRangeError",
+    "UnclonablePartError",
     "UpstreamSurfaceError",
+    "allocate_partname",
     "check_upstream_surface",
+    "clone_part",
+    "drop_relationship",
     "el",
+    "next_slide_id",
     "ordered_insert",
     "part_root",
+    "partname_template_for",
     "qn",
     "remove",
     "sld_id_lst",
     "sub",
+    "used_slide_ids",
+    "validate_slide_id",
     "xpath",
 ]
