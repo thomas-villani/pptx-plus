@@ -25,6 +25,37 @@ short form is what the docs use.
 
 from __future__ import annotations
 
+from pptx_plus.core._compat import UpstreamSurfaceError, check_upstream_surface
 from pptx_plus.core.errors import PptxPlusError
+from pptx_plus.core.ns import (
+    BUILD_NSMAP,
+    NSMAP,
+    InvalidNamespaceError,
+    qn,
+)
+from pptx_plus.core.oxml import (
+    el,
+    ordered_insert,
+    part_root,
+    remove,
+    sld_id_lst,
+    sub,
+    xpath,
+)
 
-__all__ = ["PptxPlusError"]
+__all__ = [
+    "BUILD_NSMAP",
+    "NSMAP",
+    "InvalidNamespaceError",
+    "PptxPlusError",
+    "UpstreamSurfaceError",
+    "check_upstream_surface",
+    "el",
+    "ordered_insert",
+    "part_root",
+    "qn",
+    "remove",
+    "sld_id_lst",
+    "sub",
+    "xpath",
+]
